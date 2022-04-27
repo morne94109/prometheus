@@ -3,7 +3,7 @@ import React, { FC, ReactNode } from 'react';
 import { Alert, Table } from 'reactstrap';
 
 import SeriesName from './SeriesName';
-import { Metric } from '../../types/types';
+import { Metric, Histogram } from '../../types/types';
 
 import moment from 'moment';
 
@@ -32,14 +32,17 @@ export interface DataTableProps {
 interface InstantSample {
   metric: Metric;
   value: SampleValue;
+  histogram: SampleHistogram;
 }
 
 interface RangeSamples {
   metric: Metric;
   values: SampleValue[];
+  histograms: SampleHistogram[];
 }
 
 type SampleValue = [number, string];
+type SampleHistogram = [number, Histogram];
 
 const limitSeries = <S extends InstantSample | RangeSamples>(series: S[]): S[] => {
   const maxSeries = 10000;
@@ -71,7 +74,9 @@ const DataTable: FC<DataTableProps> = ({ data, useLocalTime }) => {
             <td>
               <SeriesName labels={s.metric} format={doFormat} />
             </td>
-            <td>{s.value[1]}</td>
+            <td>
+              {s.value[1]} {s.histogram[1]}
+            </td>
           </tr>
         );
       });
@@ -88,12 +93,23 @@ const DataTable: FC<DataTableProps> = ({ data, useLocalTime }) => {
             </React.Fragment>
           );
         });
+        const histogramsAndTimes = s.histograms.map((h, hisIdx) => {
+          const printedDatetime = moment.unix(h[0]).toISOString(useLocalTime);
+          return (
+            <React.Fragment key={-hisIdx}>
+              {h[1]} @{<span title={printedDatetime}>{h[0]}</span>}
+              <br />
+            </React.Fragment>
+          );
+        });
         return (
           <tr style={{ whiteSpace: 'pre' }} key={seriesIdx}>
             <td>
               <SeriesName labels={s.metric} format={doFormat} />
             </td>
-            <td>{valuesAndTimes}</td>
+            <td>
+              {valuesAndTimes} {histogramsAndTimes}
+            </td>
           </tr>
         );
       });

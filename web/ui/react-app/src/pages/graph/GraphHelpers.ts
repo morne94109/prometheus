@@ -213,6 +213,9 @@ export const normalizeData = ({ queryParams, data, exemplars, stacked }: GraphPr
         index,
       };
     }),
+    // TODO(beorn7): Ignoring histogram data here for now. We could
+    // draw a heatmap for each, and maybe even plot count and sum
+    // together with the normal series.
     exemplars: Object.values(buckets).flatMap((bucket) => {
       if (bucket.length === 1) {
         return bucket[0];
