@@ -18,8 +18,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +47,7 @@ var (
 	}
 	userAgent        = fmt.Sprintf("Prometheus/%s", version.Version)
 	matchContentType = regexp.MustCompile(`^(?i:application\/json(;\s*charset=("utf-8"|utf-8))?)$`)
+	prometheus_host  = ""
 
 	failuresCount = prometheus.NewCounter(
 		prometheus.CounterOpts{
@@ -56,6 +59,12 @@ var (
 func init() {
 	discovery.RegisterConfig(&SDConfig{})
 	prometheus.MustRegister(failuresCount)
+	init_prometheus_host, promerr := os.Hostname()
+	if promerr != nil {
+		init_prometheus_host = os.Getenv("HOSTNAME")
+	}
+	prometheus_host = init_prometheus_host
+
 }
 
 // SDConfig is the configuration for HTTP based discovery.
@@ -146,9 +155,11 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Prometheus-Refresh-Interval-Seconds", strconv.FormatFloat(d.refreshInterval.Seconds(), 'f', -1, 64))
+	req.Header.Set("X-Prometheus-Identifier", prometheus_host)
 
 	resp, err := d.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -156,7 +167,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 		return nil, err
 	}
 	defer func() {
-		io.Copy(io.Discard, resp.Body)
+		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 	}()
 
@@ -170,7 +181,7 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 		return nil, errors.Errorf("unsupported content type %q", resp.Header.Get("Content-Type"))
 	}
 
-	b, err := io.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		failuresCount.Inc()
 		return nil, err
